@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Copyright 2026 @macario_moreno
+# SPDX-License-Identifier: Apache-2.0
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Search build dir (when run from repo) and standard install locations
+CANDIDATES=(
+    "${SCRIPT_DIR}/../build/libcz_sdl2_sym.so"
+    "${SCRIPT_DIR}/../lib/libcz_sdl2_sym.so"
+    "/usr/local/lib/libcz_sdl2_sym.so"
+    "/usr/lib/aarch64-linux-gnu/libcz_sdl2_sym.so"
+    "/usr/lib/libcz_sdl2_sym.so"
+)
+
+SHIM_SO="${CZ_SYM_SHIM_PATH:-}"
+if [[ -z "${SHIM_SO}" ]]; then
+    for candidate in "${CANDIDATES[@]}"; do
+        if [[ -f "${candidate}" ]]; then
+            SHIM_SO="$(realpath "${candidate}")"
+            break
+        fi
+    done
+fi
+
+if [[ -z "${SHIM_SO}" || ! -f "${SHIM_SO}" ]]; then
+    echo "cz-sdl2-run: could not find libcz_sdl2_sym.so" >&2
+    exit 1
+fi
+
+if [[ $# -eq 0 ]]; then
+    echo "Usage: $(basename "$0") <sdl2-command> [args...]" >&2
+    echo "Example: $(basename "$0") tic80-c0" >&2
+    exit 1
+fi
+
+if [[ -n "${LD_PRELOAD:-}" ]]; then
+    export LD_PRELOAD="${SHIM_SO}:${LD_PRELOAD}"
+else
+    export LD_PRELOAD="${SHIM_SO}"
+fi
+
+exec "$@"
